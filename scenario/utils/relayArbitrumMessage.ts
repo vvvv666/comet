@@ -3,8 +3,9 @@ import { impersonateAddress } from '../../plugins/scenario/utils';
 import { setNextBaseFeeToZero, setNextBlockTimestamp } from './hreUtils';
 import { utils, BigNumber } from 'ethers';
 import { Log } from '@ethersproject/abstract-provider';
+import { sourceTokens } from '../../plugins/scenario/utils/TokenSourcer';
 
-export default async function relayArbitrumMessage(
+export async function relayArbitrumMessage(
   governanceDeploymentManager: DeploymentManager,
   bridgeDeploymentManager: DeploymentManager,
   startingBlockNumber: number
@@ -29,7 +30,13 @@ export default async function relayArbitrumMessage(
     const wordLength = 2 * 32;
     const innnerData = header + data.slice(headerLength + (11 * wordLength));
     const toValue = data.slice(headerLength + (2 * wordLength), headerLength + (3 * wordLength));
-    const toAddress = BigNumber.from(`0x${toValue}`).toHexString();
+    let toAddress = BigNumber.from(`0x${toValue}`).toHexString();
+    
+    // if lenght of toAddress is less than 42, then it is padded with 0s and we need to add them after 0x
+    if(toAddress.length < 42) {
+      toAddress = `0x${toAddress.slice(2).padStart(40, '0')}`;
+    }
+
     const messageNum = topics[1];
     return {
       data: innnerData,
@@ -81,6 +88,25 @@ export default async function relayArbitrumMessage(
       bridgeDeploymentManager,
       sender
     );
+    // if method name == finalizeInboundTransfer(address,address,address,uint256,bytes)
+    if(data.slice(0, 10) == '0x2e567b36'){
+      const _data = '0x' + data.slice(10, 266);
+      const [token,, to, amount] = utils.defaultAbiCoder.decode(
+        ['address', 'address', 'address', 'uint256'],
+        _data
+      );
+      // if token is mainnet ETH -> than source arbitrum weth
+      if(token == '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'){
+        await sourceTokens({
+          dm: bridgeDeploymentManager,
+          amount: amount,
+          asset: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+          address: to,
+          blacklist: [],
+        });
+        continue;
+      }
+    }
     const transactionRequest = await arbitrumSigner.populateTransaction({
       to: toAddress,
       from: sender,
@@ -109,5 +135,126 @@ export default async function relayArbitrumMessage(
       await setNextBaseFeeToZero(bridgeDeploymentManager);
       await bridgeReceiver.executeProposal(id, { gasPrice: 0 });
     }
+  }
+}
+
+export async function relayCCTPMint(
+  governanceDeploymentManager: DeploymentManager,
+  bridgeDeploymentManager: DeploymentManager,
+  startingBlockNumber: number
+){
+  // CCTP relay
+  // L1 contracts
+  const L1MessageTransmitter = await governanceDeploymentManager.getContractOrThrow('CCTPMessageTransmitter');
+  // Arbitrum TokenMinter which is L2 contracts
+  const TokenMinter = 
+    bridgeDeploymentManager.network === 'arbitrum' ? 
+      await bridgeDeploymentManager.existing('TokenMinter', '0xE7Ed1fa7f45D05C508232aa32649D89b73b8bA48', 'arbitrum') : 
+      await bridgeDeploymentManager.existing('TokenMinter', '0xE997d7d2F6E065a9A93Fa2175E878Fb9081F1f0A', 'arbitrum-goerli');
+
+
+  const depositForBurnEvents: Log[] = await governanceDeploymentManager.hre.ethers.provider.getLogs({
+    fromBlock: startingBlockNumber,
+    toBlock: 'latest',
+    address: L1MessageTransmitter.address,
+    topics: [utils.id('MessageSent(bytes)')]
+  });
+
+  // Decode message body
+  const burnEvents = depositForBurnEvents.map(({ data }) => {
+    const dataBytes = utils.arrayify(data);
+    // Since data is encodePacked, so can't simply decode via AbiCoder.decode
+    const offset = 64;
+    const length = {
+      uint32: 4,
+      uint64: 8,
+      bytes32: 32,
+      uint256: 32,
+    };
+    let start = offset;
+    let end = start + length.uint32;
+    // msgVersion, skip won't use
+    start = end;
+    end = start + length.uint32;
+    // msgSourceDomain
+    const msgSourceDomain = BigNumber.from(dataBytes.slice(start, end)).toNumber();
+
+    start = end;
+    end = start + length.uint32;
+    // msgDestinationDomain, skip won't use
+
+    start = end;
+    end = start + length.uint64;
+    // msgNonce, skip won't use
+
+    start = end;
+    end = start + length.bytes32;
+    // msgSender, skip won't use
+
+    start = end;
+    end = start + length.bytes32;
+    // msgRecipient, skip won't use
+
+    start = end;
+    end = start + length.bytes32;
+    // msgDestination, skip won't use
+
+    start = end;
+    end = start + length.uint32;
+    // rawMsgBody version, skip won't use
+
+    start = end;
+    end = start + length.bytes32;
+    // rawMsgBody burnToken
+    const burnToken = utils.hexlify(dataBytes.slice(start, end));
+
+    start = end;
+    end = start + length.bytes32;
+    // rawMsgBody mintRecipient
+    const mintRecipient = utils.getAddress(utils.hexlify(dataBytes.slice(start, end)).slice(-40));
+
+    start = end;
+    end = start + length.uint256;
+
+    // rawMsgBody amount
+    const amount = BigNumber.from(dataBytes.slice(start, end)).toNumber();
+
+    start = end;
+    end = start + length.bytes32;
+    // rawMsgBody messageSender, skip won't use
+
+    return {
+      recipient: mintRecipient,
+      amount: amount,
+      sourceDomain: msgSourceDomain,
+      burnToken: burnToken
+    };
+  });
+
+  // Impersonate the Arbitrum TokenMinter and mint token to recipient
+  const ImpersonateLocalTokenMessenger = 
+  bridgeDeploymentManager.network === 'arbitrum' ? '0x19330d10d9cc8751218eaf51e8885d058642e08a' : 
+    bridgeDeploymentManager.network === 'arbitrum-goerli' ? '0x12dcfd3fe2e9eac2859fd1ed86d2ab8c5a2f9352' : 
+      '0x0';
+  // Impersonate the Arbitrum TokenMinter and mint token to recipient
+  for (let burnEvent of burnEvents) {
+    const { recipient, amount, sourceDomain, burnToken } = burnEvent;
+    const localTokenMessengerSigner = await impersonateAddress(
+      bridgeDeploymentManager,
+      ImpersonateLocalTokenMessenger
+    );
+
+    const transactionRequest = await localTokenMessengerSigner.populateTransaction({
+      to: TokenMinter.address,
+      from: ImpersonateLocalTokenMessenger,
+      data: TokenMinter.interface.encodeFunctionData('mint', [sourceDomain, burnToken, utils.getAddress(recipient), amount]),
+      gasPrice: 0
+    });
+
+    await setNextBaseFeeToZero(bridgeDeploymentManager);
+
+    await (
+      await localTokenMessengerSigner.sendTransaction(transactionRequest)
+    ).wait();
   }
 }

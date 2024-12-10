@@ -41,6 +41,12 @@ Also, you can simulate either of the previous steps to see what effect they woul
 yarn hardhat migrate --network goerli --deployment usdc --prepare --simulate 164443237_my_migration
 ```
 
+When simulating a migration, you can also impersonate an address to run the migration as. This can be helpful when trying to test a migration that makes a proposal, which requires an address with enough COMP:
+
+```sh
+yarn hardhat migrate --network goerli --deployment usdc --prepare --simulate --impersonate ADDRESS_TO_IMPERSONATE 164443237_my_migration
+```
+
 ## Running a Migration in GitHub
 
 The preferred way to run a migration is in GitHub, via manual workflow dispatch. The goal of this approach is that it's clear to everyone the exact code that ran, which affords less opportunity for "I'm looking at \<CODE X\>, but what was deployed was actually \<CODE Y\>." Look at "Prepare Migration" and "Enact Migration" dispatches in GitHub Actions in this repo (or any fork).
@@ -53,7 +59,7 @@ After preparation, a migration stores some artifacts under `deployments/goerli/u
 
 Migrations can be tested using Comet's [scenario framework](https://github.com/compound-finance/comet/blob/main/SCENARIO.md).
 
-Migrations that have been committed to a branch but not enacted yet will automatically be picked up and run by the scenarios framework (in the [MigrationConstraint](https://github.com/compound-finance/comet/blob/main/scenario/constraints/MigrationConstraint.ts)). This ensures that any new migrations are checked against all existing scenarios and any issues with a migration can be proactively caught.
+Migrations that have been staged to a branch but not enacted yet will automatically be picked up and run by the scenarios framework (in the [MigrationConstraint](https://github.com/compound-finance/comet/blob/main/scenario/constraints/MigrationConstraint.ts)). This ensures that any new migrations are checked against all existing scenarios and any issues with a migration can be proactively caught. Remember, migrations **need to be staged in git** before it can be picked up by scenarios.
 
 Migrations should also include a `verify` function to check that the correct state-changes are made by it. This `verify` block is also run as part of the scenario framework.
 

@@ -11,6 +11,7 @@ export function getEtherscanApiUrl(network: string): string {
     rinkeby: 'api-rinkeby.etherscan.io',
     ropsten: 'api-ropsten.etherscan.io',
     goerli: 'api-goerli.etherscan.io',
+    sepolia: 'api-sepolia.etherscan.io',
     mainnet: 'api.etherscan.io',
     fuji: 'api-testnet.snowtrace.io',
     avalanche: 'api.snowtrace.io',
@@ -18,8 +19,13 @@ export function getEtherscanApiUrl(network: string): string {
     polygon: 'api.polygonscan.com',
     arbitrum: 'api.arbiscan.io',
     'arbitrum-goerli': 'api-goerli.arbiscan.io',
+    base: 'api.basescan.org',
     'base-goerli': 'api-goerli.basescan.org',
-    'linea-goerli': 'api-goerli.lineascan.build'
+    'linea-goerli': 'api-goerli.lineascan.build',
+    optimism: 'api-optimistic.etherscan.io',
+    mantle: 'api.mantlescan.xyz',
+    'scroll-goerli': 'alpha-blockscout.scroll.io',
+    scroll: 'api.scrollscan.com'
   }[network];
 
   if (!host) {
@@ -34,6 +40,7 @@ export function getEtherscanUrl(network: string): string {
     rinkeby: 'rinkeby.etherscan.io',
     ropsten: 'ropsten.etherscan.io',
     goerli: 'goerli.etherscan.io',
+    sepolia: 'sepolia.etherscan.io',
     mainnet: 'etherscan.io',
     fuji: 'testnet.snowtrace.io',
     avalanche: 'snowtrace.io',
@@ -41,8 +48,13 @@ export function getEtherscanUrl(network: string): string {
     polygon: 'polygonscan.com',
     arbitrum: 'arbiscan.io',
     'arbitrum-goerli': 'goerli.arbiscan.io',
+    base: 'basescan.org',
     'base-goerli': 'goerli.basescan.org',
-    'linea-goerli': 'goerli.lineascan.build'
+    'linea-goerli': 'goerli.lineascan.build',
+    optimism: 'optimistic.etherscan.io',
+    mantle: 'mantlescan.xyz',
+    'scroll-goerli': 'alpha-blockscout.scroll.io',
+    scroll: 'scrollscan.com'
   }[network];
 
   if (!host) {
@@ -57,6 +69,7 @@ export function getEtherscanApiKey(network: string): string {
     rinkeby: process.env.ETHERSCAN_KEY,
     ropsten: process.env.ETHERSCAN_KEY,
     goerli: process.env.ETHERSCAN_KEY,
+    sepolia: process.env.ETHERSCAN_KEY,
     mainnet: process.env.ETHERSCAN_KEY,
     fuji: process.env.SNOWTRACE_KEY,
     avalanche: process.env.SNOWTRACE_KEY,
@@ -64,8 +77,13 @@ export function getEtherscanApiKey(network: string): string {
     polygon: process.env.POLYGONSCAN_KEY,
     arbitrum: process.env.ARBISCAN_KEY,
     'arbitrum-goerli': process.env.ARBISCAN_KEY,
-    'base-goerli': process.env.ETHERSCAN_KEY,
-    'linea-goerli': process.env.LINEASCAN_KEY
+    base: process.env.BASESCAN_KEY,
+    'base-goerli': process.env.BASESCAN_KEY,
+    'linea-goerli': process.env.LINEASCAN_KEY,
+    optimism: process.env.OPTIMISMSCAN_KEY,
+    mantle: process.env.MANTLESCAN_KEY,
+    'scroll-goerli': process.env.ETHERSCAN_KEY,
+    scroll: process.env.ETHERSCAN_KEY
   }[network];
 
   if (!apiKey) {
